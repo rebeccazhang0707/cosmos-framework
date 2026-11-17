@@ -32,10 +32,16 @@ for split, count in (("train", 360), ("val", 40)):
     if len(episodes) != count or {e["task_name"] for e in episodes} != expected:
         raise ValueError(f"Expected the original four-task {split} split")
 required = dict(action_dim=20, domain_id=17, action_representation="eef_relative_chunk",
-                normalization_applied=True, chunk_length=16, sample_stride=8)
+                normalization_applied=True, chunk_length=16, sample_stride=8,
+                video_source_dataset="RoboDojo_ee_lerobot_v30_video")
 for key, value in required.items():
     if m.get(key) != value:
         raise ValueError(f"Wrong EEF contract: {key}={m.get(key)!r}, expected {value!r}")
+rgb_root = Path(m["root"]).resolve()
+if rgb_root.name != "RoboDojo_ee_lerobot_v30_video" or rgb_root != Path(m["video_source_root"]).resolve():
+    raise ValueError("EEF training must read official ee_lerobot RGB, not joint-version RGB")
+print(f"OFFICIAL_EEF_RGB_ROOT={rgb_root}", flush=True)
+print(f"OFFICIAL_EEF_RGB_REVISION={m['video_source_revision']}", flush=True)
 stats = json.loads((root / m["normalization_file"]).read_text())
 if stats["validation_used"] or stats["fit_split"] != "train" or stats["action"]["clip"] or stats["state"]["clip"]:
     raise ValueError("Expected frozen training-only state/action statistics without clipping")

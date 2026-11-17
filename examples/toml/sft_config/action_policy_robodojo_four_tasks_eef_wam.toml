@@ -2,6 +2,8 @@
 # Shared: Edge initialization; WAM; 960x720 composite -> 960x736 padded canvas;
 # 16 GPUs; microbatch80 x accumulation2; global batch2560; horizon16; stride8;
 # identical classify_objects/insert_tubes/push_T/stack_bowls demos and ordering.
+# Video sources differ: joint control uses RoboDojo_lerobot_v30_video; this arm
+# uses official RoboDojo_ee_lerobot_v30_video RGB and its own episode offsets.
 # Joint control: raw absolute14D joint/gripper state and action, no normalization.
 # This arm: normalized20D absolute EEF state; normalized20D chunk-relative action.
 # Each arm action=[p_target-p_anchor,rot6d(R_target@R_anchor.T),absolute_gripper].
@@ -13,6 +15,7 @@
 # EEF-normalized and raw-joint action FM losses have different numerical scales.
 # Prepare the control with tools/robodojo/prepare_eef_control.py using the frozen
 # EEF source and original joint prepared directory as --source and --reference.
+# Also pass --eef-video-root pointing to the downloaded official EEF RGB root.
 # The shared Slurm launcher stops near the 4h deadline and saves the final step.
 [job]
 task = "vfm"

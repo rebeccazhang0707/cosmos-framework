@@ -5,6 +5,8 @@
 # EEF comparison: action_policy_robodojo_four_tasks_eef_wam.toml keeps all training
 # hyperparameters, image layout and domain17, with normalized relative EEF20
 # action and separately normalized absolute EEF20 clean state.
+# Video source: this control uses joint-version RGB; the EEF arm uses the
+# official ee_lerobot-version RGB with its own video indices and offsets.
 # Slurm: ROBODOJO_ACTION_SPACE=joint sbatch examples/robodojo/four_tasks_wam.sbatch.
 # Use the original four-task joint-action prepared data, not the all35/EEF data.
 # Export ROBODOJO_PREPARED_ROOT, BASE_CHECKPOINT_PATH, WAN_VAE_PATH and

@@ -3,7 +3,7 @@
 # ROBODOJO_PREPARED_ROOT, BASE_CHECKPOINT_PATH, WAN_VAE_PATH, IMAGINAIRE_OUTPUT_ROOT.
 # ROBODOJO_ACTION_SPACE=joint selects raw14D exp1; =eef selects normalized relative20D.
 # Both use 960x736, global batch2560, 16 GPUs, LR5e-5 and warmup50.
-# The EEF prepared manifest must preserve the joint control's demo order/splits.
+# The EEF manifest preserves demo order/splits and uses official EEF RGB offsets.
 # Example: ROBODOJO_ACTION_SPACE=eef sbatch examples/robodojo/four_tasks_wam.sbatch
 #SBATCH --account=general_sa
 #SBATCH --partition=batch
