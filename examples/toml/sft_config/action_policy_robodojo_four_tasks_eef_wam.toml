@@ -1,0 +1,68 @@
+# Controlled comparison against action_policy_robodojo_four_tasks_wam.toml.
+# Shared: Edge initialization; WAM; 960x720 composite -> 960x736 padded canvas;
+# 16 GPUs; microbatch80 x accumulation2; global batch2560; horizon16; stride8;
+# identical classify_objects/insert_tubes/push_T/stack_bowls demos and ordering.
+# Joint control: raw absolute14D joint/gripper state and action, no normalization.
+# This arm: normalized20D absolute EEF state; normalized20D chunk-relative action.
+# Each arm action=[p_target-p_anchor,rot6d(R_target@R_anchor.T),absolute_gripper].
+# State/action use separate frozen q01/q99 statistics from all35 training demos;
+# validation is excluded, values are not clipped. Anchor is the current state.
+# Both isolated controls retain domain17 to pair action_modality_embed initialization.
+# The full35 EEF source retains its own domain18; use the dedicated four-task manifest.
+# action2llm/llm2action LR x5; modality LR x1, exactly as original exp1.
+# EEF-normalized and raw-joint action FM losses have different numerical scales.
+# Prepare the control with tools/robodojo/prepare_eef_control.py using the frozen
+# EEF source and original joint prepared directory as --source and --reference.
+# The shared Slurm launcher stops near the 4h deadline and saves the final step.
+[job]
+task = "vfm"
+experiment = "action_policy_robodojo_four_tasks_eef_wam"
+project = "robodojo"
+group = "four_tasks_wam"
+name = "edge_eef20_relative_960x736_16gpu"
+wandb_mode = "disabled"
+
+[model]
+precision = "bfloat16"
+max_num_tokens_after_packing = -1
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 2
+
+[model.activation_checkpointing]
+mode = "selective"
+save_ops_regex = ["fmha"]
+
+[model.tokenizer]
+vae_path = "${oc.env:WAN_VAE_PATH}"
+
+[optimizer]
+lr = 5e-5
+weight_decay = 0.05
+betas = [0.9, 0.99]
+eps = 1e-8
+lr_multipliers = {action2llm = 5.0, llm2action = 5.0, action_modality_embed = 1.0}
+
+[scheduler]
+cycle_lengths = [16000]
+warm_up_steps = [50]
+f_start = [0.0]
+f_max = [1.0]
+f_min = [0.0]
+
+[dataloader_train]
+max_samples_per_batch = 80
+
+[trainer]
+max_iter = 2000
+logging_iter = 1
+grad_accum_iter = 2
+
+[trainer.callbacks.compile_tokenizer]
+enabled = false
+
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH}"
+save_iter = 50
+keys_to_skip_loading = ["net_ema.", "action2llm", "llm2action"]
