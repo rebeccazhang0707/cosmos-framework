@@ -1,5 +1,6 @@
 """Control-boundary checks independent of CUDA/Isaac/model dependencies."""
 
+import json
 import unittest
 from types import SimpleNamespace
 
@@ -66,6 +67,7 @@ class EEFControlTests(unittest.TestCase):
         self.assertEqual(command["right_ee_joint_state"], [0])
         self.assertFalse(diag["right"]["ik_success"])
         self.assertTrue(diag["left"]["gripper_clipped"])
+        json.dumps(diag, allow_nan=False)  # simulator telemetry must contain native JSON scalars
 
     def test_reject_joint_actions_raw20_nonfinite_and_bad_quaternion(self):
         for packet in ([0] * 14, np.zeros((16, 20)), {"targets": np.zeros((16, 16))}):

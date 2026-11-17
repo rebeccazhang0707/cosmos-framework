@@ -69,7 +69,7 @@ def native_joint_action(manager, target16, env_idx=0):
         diagnostics[arm] = {
             "ik_success": success,
             "max_joint_delta_rad": float(np.abs(joint - current).max()),
-            "gripper_clipped": grip != target[index, 7],
+            "gripper_clipped": bool(grip != target[index, 7]),
             "eef_world_target": target[index].tolist(),
             "joint_target": joint.tolist(),
         }
