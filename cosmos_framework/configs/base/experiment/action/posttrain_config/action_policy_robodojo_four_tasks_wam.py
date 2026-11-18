@@ -52,3 +52,18 @@ d["dataloader"]["datasets"] = dict(
 ConfigStore.instance().store(
     group="experiment", package="_global_", name="action_policy_robodojo_four_tasks_wam", node=c
 )
+
+# Native-resolution control for exp1: same joint14 data/optimizer initialization,
+# with the smaller canvas and its explicit RF shift. Register beside the base
+# recipe so existing runs retain their frozen 960x736/720 settings.
+action_policy_robodojo_four_tasks_wam_480_shift5 = copy.deepcopy(action_policy_robodojo_four_tasks_wam)
+small = action_policy_robodojo_four_tasks_wam_480_shift5
+small["model"]["config"]["resolution"] = "480"
+small["model"]["config"]["rectified_flow_training_config"]["shift"] = 5
+small["trainer"]["callbacks"]["robodojo_monitor"] = L(RoboDojoTrainingMonitor)(canvas_width=736, canvas_height=544)
+small["dataloader_train"]["dataloader"]["datasets"]["robodojo"]["dataset"].update(
+    resolution="480", canvas_width=736, canvas_height=544
+)
+ConfigStore.instance().store(
+    group="experiment", package="_global_", name="action_policy_robodojo_four_tasks_wam_480_shift5", node=small
+)

@@ -42,6 +42,14 @@ class RoboDojoTrainingMonitor(Callback):
         (self.root / f"init_rank_{dist.get_rank():02d}_step_{iteration}.json").write_text(
             json.dumps(dict(iteration=iteration, parameters=parameters), indent=2) + "\n"
         )
+        reference = os.environ.get("ROBODOJO_REFERENCE_INIT_AUDIT")
+        if iteration == 0 and reference:
+            expected = json.loads((Path(reference) / f"init_rank_{dist.get_rank():02d}_step_0.json").read_text())
+            if parameters != expected["parameters"]:
+                raise ValueError("Initial action parameters differ from the paired reference")
+            (self.root / f"init_match_rank_{dist.get_rank():02d}.json").write_text(
+                json.dumps(dict(matched=True, reference=reference)) + "\n"
+            )
         if iteration == 0:
             misc.set_random_seed(42, by_rank=True)
 

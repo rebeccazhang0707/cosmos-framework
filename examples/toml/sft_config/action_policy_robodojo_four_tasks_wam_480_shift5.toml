@@ -1,0 +1,59 @@
+# Resolution/noise-schedule control against joint-space exp1 (960x736, tier720, shift10).
+# Changes: tier480, 736x544 reflection-padded canvas, explicit shared RF shift5.
+# Same raw joint14 action/state, original joint RGB, domain17, four-task360/40 split;
+# Edge initialization, seed42, micro80 x accumulation2 x16 GPUs = global batch2560;
+# LR5e-5, warmup50, action2llm/llm2action LR x5, modality LR x1, WAM horizon16.
+# First compare at step800. Four-hour jobs resume model/optimizer/scheduler/RNG.
+# Recipe registration is beside the original four-task WAM experiment.
+[job]
+task = "vfm"
+experiment = "action_policy_robodojo_four_tasks_wam_480_shift5"
+project = "robodojo"
+group = "four_tasks_wam"
+name = "edge_joint14_480_shift5_16gpu"
+wandb_mode = "disabled"
+
+[model]
+precision = "bfloat16"
+max_num_tokens_after_packing = -1
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 2
+
+[model.activation_checkpointing]
+mode = "selective"
+save_ops_regex = ["fmha"]
+
+[model.tokenizer]
+vae_path = "${oc.env:WAN_VAE_PATH}"
+
+[optimizer]
+lr = 5e-5
+weight_decay = 0.05
+betas = [0.9, 0.99]
+eps = 1e-8
+lr_multipliers = {action2llm = 5.0, llm2action = 5.0, action_modality_embed = 1.0}
+
+[scheduler]
+cycle_lengths = [16000]
+warm_up_steps = [50]
+f_start = [0.0]
+f_max = [1.0]
+f_min = [0.0]
+
+[dataloader_train]
+max_samples_per_batch = 80
+
+[trainer]
+max_iter = 800
+logging_iter = 1
+grad_accum_iter = 2
+
+[trainer.callbacks.compile_tokenizer]
+enabled = false
+
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH}"
+save_iter = 50
+keys_to_skip_loading = ["net_ema.", "action2llm", "llm2action"]

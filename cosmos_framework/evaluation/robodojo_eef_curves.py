@@ -22,7 +22,7 @@ def atomic_text(path, text):
     os.replace(temp, path)
 
 
-def publish(root):
+def publish(root, train_dir=None, label="EEF20 · four-task WAM"):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -33,9 +33,9 @@ def publish(root):
     out.mkdir(parents=True, exist_ok=True)
     with (out / ".plot.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        source = (
-            root / "train/robodojo/four_tasks_wam/edge_eef20_relative_960x736_16gpu/robodojo/training_metrics.jsonl"
-        )
+        if train_dir is None:
+            train_dir = root / "train/robodojo/four_tasks_wam/edge_eef20_relative_960x736_16gpu"
+        source = train_dir / "robodojo/training_metrics.jsonl"
         by_step = {}
         for line in source.read_text().splitlines():
             try:
@@ -106,7 +106,7 @@ def publish(root):
                 if index == 2:
                     ax.set_xlabel("Optimizer step")
         fig.suptitle(
-            f"RoboDojo EEF20 · four-task WAM · through step {x[-1]}\n"
+            f"RoboDojo {label} · through step {x[-1]}\n"
             "Train = online weights; held-out = EMA used by SR, fixed noise seeds, no updates",
             fontsize=13,
         )
@@ -144,12 +144,14 @@ def publish(root):
             "resume_steps": resumes,
             "training_weights": "online",
             "validation_weights": "EMA (same as SR)",
+            "label": label,
             "validation_checkpoints": [
                 {
                     "step": v["step"],
                     "windows": v["validation_windows"],
                     "episodes": v["validation_episodes"],
                     "overall": v["overall"],
+                    "evaluation_shift_override": v.get("evaluation_shift_override"),
                 }
                 for v in validations
             ],
@@ -160,8 +162,8 @@ def publish(root):
             "definition": "Native flow-matching objective; validation covers the held-out split with fixed paired noise seeds",
         }
         atomic_text(out / "summary.json", json.dumps(summary, indent=2) + "\n")
-        html = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="120"><title>EEF4 · train / held-out loss</title><style>body{font:16px system-ui;max-width:1360px;margin:30px auto;padding:0 20px;line-height:1.7;color:#172033}img{width:100%}a{color:#2563eb}td,th{padding:8px 15px;border-bottom:1px solid #ddd;text-align:left}aside{background:#f1f5f9;padding:12px 16px;border-radius:8px}</style><h1>4-task EEF20 · WAM 训练 / 验证 loss</h1>"""
-        html += f'<p>训练记录至 step <b>{x[-1]}</b>；图表更新时间：{summary["generated_at_utc"]} UTC。<a href="../">闭环 SR 与视频</a>。</p>'
+        html = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="120"><title>RoboDojo · train / held-out loss</title><style>body{font:16px system-ui;max-width:1360px;margin:30px auto;padding:0 20px;line-height:1.7;color:#172033}img{width:100%}a{color:#2563eb}td,th{padding:8px 15px;border-bottom:1px solid #ddd;text-align:left}aside{background:#f1f5f9;padding:12px 16px;border-radius:8px}</style><h1>RoboDojo · WAM 训练 / 验证 loss</h1>"""
+        html += f'<p>{label}；训练记录至 step <b>{x[-1]}</b>；图表更新时间：{summary["generated_at_utc"]} UTC。<a href="../">闭环 SR 与视频</a>。</p>'
         html += "<aside>蓝/绿/紫：训练逐步值与向后50步均值；橙色点：完整 held-out split 的 EMA loss，与 SR 使用同一 checkpoint。验证固定噪声种子、关闭 CFG dropout，无梯度或参数更新。虚线：续训边界。指标是 flow-matching loss。</aside>"
         html += '<p>每次验证完成会自动重画此页；本页每2分钟刷新。训练曲线使用在线权重，验证使用 EMA，阅读两者差距时请注意。</p><p><a href="loss_curves.png">PNG</a> · <a href="loss_curves.svg">SVG</a> · <a href="training_losses.csv">训练 CSV</a> · <a href="validation_losses.csv">验证 CSV（含各任务）</a> · <a href="summary.json">统计与来源</a></p>'
         html += "<table><tr><th>Checkpoint</th><th>验证窗口</th><th>Action FM</th><th>Image FM</th><th>Total</th></tr>"
@@ -179,4 +181,7 @@ def publish(root):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, required=True)
-    publish(parser.parse_args().run_root)
+    parser.add_argument("--train-dir", type=Path)
+    parser.add_argument("--label", default="EEF20 · four-task WAM")
+    args = parser.parse_args()
+    publish(args.run_root, args.train_dir, args.label)
