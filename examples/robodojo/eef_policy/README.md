@@ -50,3 +50,30 @@ variants. Preserve five preselected episodes per family with all three native
 camera videos. Video pruning affects only completed episodes in this unique
 evaluation run. Results, episode counts, config/normalizer hashes and original
 video links are published under `RUN/continuation/public/segmentNN_stepK/`.
+
+## Paired held-out losses
+
+Run `submit_validations.py --run-root RUN --repo FROZEN_VALIDATION_REPO
+--source-commit COMMIT` after adding SR jobs to the continuation plan. It pairs
+one validation job with each SR checkpoint, backfills finished checkpoints,
+and skips duplicate SR phases and no-op safety segments. Each future job depends
+only on the same completed training boundary as SR. Training and SR never wait
+for validation, and the running training/SR source snapshots remain unchanged.
+
+`validation.sbatch RUN FROZEN_VALIDATION_REPO SEGMENTS` uses four independent
+GPU workers, one per task. It reads only immutable segment snapshots and all
+held-out windows, with the checkpoint's official EEF videos, normalized EEF20
+labels, current-state conditioning, camera canvas and training mode. It loads
+EMA (matching SR), uses eval mode/no gradients, disables CFG dropout, fixes
+per-task/per-batch noise seeds, and never updates weights. Native
+`training_step` computes the validation objective because `validation_step`
+is a stub in this framework revision. These are flow-matching losses rather
+than generated-action reconstruction errors or rollout success.
+
+Results contain window-weighted and task-macro action/image/total losses plus
+per-task values and dataset/normalizer hashes. Incomplete shards cannot publish
+a complete validation point. Completed results appear next to the matching SR
+report as `validation.json`. After every checkpoint, the publisher automatically
+refreshes `continuation/public/loss/` with training curves, EMA validation
+points and downloadable per-task CSV data. The online training curve and EMA
+validation curve use different weights, which is labeled on the plots.
