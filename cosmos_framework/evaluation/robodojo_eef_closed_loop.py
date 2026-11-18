@@ -309,7 +309,14 @@ def worker(index):
                 command, env=env, stdout=stream, stderr=subprocess.STDOUT, start_new_session=True
             )
             try:
-                code = process.wait(timeout=max(1, deadline - time.time()))
+                while True:
+                    try:
+                        code = process.wait(timeout=max(1, min(60, deadline - time.time())))
+                        break
+                    except subprocess.TimeoutExpired:
+                        publish()  # expose completed episodes before an entire seed/task cell finishes
+                        if time.time() >= deadline:
+                            raise
             except subprocess.TimeoutExpired:
                 os.killpg(process.pid, signal.SIGTERM)
                 try:

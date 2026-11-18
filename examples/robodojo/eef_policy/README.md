@@ -77,3 +77,12 @@ report as `validation.json`. After every checkpoint, the publisher automatically
 refreshes `continuation/public/loss/` with training curves, EMA validation
 points and downloadable per-task CSV data. The online training curve and EMA
 validation curve use different weights, which is labeled on the plots.
+
+SR workers publish partial episode counts and retained video links at least
+once per minute, even before a task/seed quota finishes. For jobs already running
+an older frozen source, `cosmos_framework.evaluation.robodojo_publication_watch`
+can run beside them on the login node: pass `--run-dir RUN --publisher SCRIPT`
+and `--python REPORT_PYTHON`. It invokes the existing script's `--publish`
+entry point every60 seconds, writes `public/publication_status.json`, and exits
+when SR finishes. It uses a per-run lock, preserves native videos, and never
+restarts inference or training.
