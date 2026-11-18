@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: OpenMDW-1.1
-"""Opt-in Edge WAM training with frozen image+text reasoner prefill (no AR)."""
+"""Edge WAM with frozen image+text reasoner prefill for training and policy sampling."""
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -135,8 +135,47 @@ class OmniMoTReasonerVisionModel(OmniMoTModel):
         pack_reasoner_vision(packed, gen_data_clean.reasoner_vision, self.reasoner_multimodal_config)
         return packed
 
-    def _prepare_inference_data(self, *args, **kwargs):
-        raise NotImplementedError(
-            "This recipe implements training prefill only. Policy serving must also supply current-image UND tokens; "
-            "the text-only WAM inference path cannot evaluate this checkpoint correctly."
-        )
+    def get_data_and_condition(self, data_batch, *args, **kwargs):
+        clean = super().get_data_and_condition(data_batch, *args, **kwargs)
+        if "_reasoner_inference_tokens" in data_batch:
+            # Attach before the parent's first pack (which builds denoising masks).
+            clean.reasoner_vision = data_batch["_reasoner_vision"]
+        return clean
+
+    def _get_inference_text_tokens(self, data_batch, has_negative_prompt, caption_groups=None):
+        if has_negative_prompt or caption_groups is not None:
+            raise ValueError("Reasoner WAM sampling supports one image+caption and guidance1 only")
+        tokens = data_batch["_reasoner_inference_tokens"]
+        # The unconditional path is unused: generate_samples_from_batch rejects CFG.
+        return tokens, tokens
+
+    @torch.no_grad()
+    def _prepare_inference_data(self, data_batch, seed, has_negative_prompt=False):
+        if has_negative_prompt:
+            raise ValueError("Reasoner WAM sampling supports guidance1 only")
+        plans = data_batch.get("sequence_plan", [])
+        if not plans or any(
+            list(p.condition_frame_indexes_vision) != [0] or list(p.condition_frame_indexes_action) != [0]
+            for p in plans
+        ):
+            raise ValueError("Reasoner WAM sampling requires current-image/current-state conditions")
+        request = dict(data_batch)
+        # Use precisely the training processor and frozen ViT on RGB t=0, before
+        # the parent may release the raw input after VAE conditioning encode.
+        request["_reasoner_inference_tokens"] = self._load_and_tokenize_text_data(request, iteration=0)
+        try:
+            return super()._prepare_inference_data(request, seed, has_negative_prompt=False)
+        finally:
+            request.pop("_reasoner_inference_tokens", None)
+            request.pop("_reasoner_vision", None)
+
+    def generate_samples_from_batch(self, data_batch, *, guidance=1.0, **kwargs):
+        if (
+            guidance != 1.0
+            or kwargs.get("has_negative_prompt", False)
+            or kwargs.get("use_batched_cfg", False)
+            or kwargs.get("upsample_task") is not None
+            or kwargs.get("velocity_postprocess_builder") is not None
+        ):
+            raise ValueError("Reasoner WAM policy sampling requires guidance1 without prompt rewriting or CFG")
+        return super().generate_samples_from_batch(data_batch, guidance=guidance, **kwargs)

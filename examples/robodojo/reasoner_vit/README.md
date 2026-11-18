@@ -6,8 +6,9 @@ It inherits the four-task joint-space 480/shift5 control: classify_objects,
 insert_tubes, push_T and stack_bowls; raw absolute joint/gripper14 labels;
 domain17; current state + 16 target actions; a 736×544 stitched camera canvas.
 The optimizer, seed42, global batch2560, and 1600-step limit remain the same.
-This recipe uses micro160 × accumulation1 ×16 GPUs, while the control uses
-micro80 × accumulation2. This is an independent experiment/run name.
+This recipe uses micro160 × accumulation1 ×16 GPUs. The control now uses the
+same layout from its second segment; its first segment used micro80 ×
+accumulation2. This is an independent experiment/run name.
 Full-block activation checkpointing recomputes attention during backward to
 reduce the measured micro160 peak; the paired launcher enables expandable
 allocator segments. The original selective checkpoint policy ran out of memory
@@ -52,8 +53,20 @@ shared `MASTER_ADDR`, then run on each node:
 bash examples/launch_sft_action_policy_robodojo_four_tasks_wam_480_reasoner_vit.sh
 ```
 
-Additional ViT work and UND tokens increase memory and step time; micro160
-requires a GPU capacity check. This implementation
-is the **training path**. The current text-only policy server/evaluator must be
-adapted to supply the same image+text UND inputs before evaluating this
-checkpoint; this model rejects that old sampling path explicitly.
+Additional ViT work and UND tokens increase memory and step time. The current
+model also supports WAM policy sampling with `guidance=1`: it calls the same
+current-image ViT/processor as training, attaches features before the first
+denoising pack, and retains those features for every denoising step. Sampling
+rejects text CFG, negative prompts and prompt rewriting. Only current RGB and
+joint state condition the prediction; there is no cross-request visual cache.
+
+The first evaluation targets the exact saved checkpoint1000 (about the fifth
+four-hour segment at the measured63.5 seconds/step). A CPU-only watcher calls
+`schedule_evaluation.py`: it waits for all model/optimizer/scheduler/trainer DCP
+metadata, pins immutable config/checkpoint links, then submits one GPU job.
+It inserts that job into the baseline evaluation dependency chain so at most
+one evaluation node runs across both experiments. No GPU waits for training
+to reach the target. Native SR and full held-out losses share one
+one-node/eight-GPU job and retain five three-camera bundles/task.
+Use an isolated inference runtime containing the image-conditioned sampler;
+leave the frozen running training runtime unchanged.

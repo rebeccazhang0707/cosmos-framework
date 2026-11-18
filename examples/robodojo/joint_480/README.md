@@ -14,8 +14,8 @@ The first segment of the 20261117 control was already running micro80 ×
 accumulation2 when this update was requested. It finishes without interruption;
 segments2 onward resume its full checkpoint with micro160 × accumulation1.
 The isolated continuation runtime differs only in these two TOML values;
-the original runtime and model/optimizer schedule remain unchanged. Capacity
-and speed of micro160 still need confirmation when the next segment runs.
+the original runtime and model/optimizer schedule remain unchanged. Per-rank
+memory/timing records track the measured capacity and speed after the switch.
 
 `train.sbatch RUN SEGMENT` uses an isolated run's `environment.sh` and checks
 its `control/config_audit.json`. Segment1 starts from Edge; subsequent segments
@@ -24,7 +24,10 @@ monitor stops after a full optimizer step before the four-hour deadline.
 `segments.py` pins immutable evaluation snapshots and cancels unused future
 segments after reaching1600. The goal is not a reset at each Slurm boundary.
 
-Each boundary has **one** `evaluate.sbatch RUN SEGMENT` job, requesting one
+Evaluate after **two four-hour training segments** (nominally eight hours),
+plus the final goal checkpoint. Keep the already-running segment2 evaluation;
+skip segments3 and5, then evaluate segments4 and6 and the final segment7 if
+needed. Each evaluation has **one** `evaluate.sbatch RUN SEGMENT` job, requesting one
 node / eight GPUs for at most four hours. It runs held-out validation first,
 then SR on four policy/simulator GPU pairs. The existing eight logical SR
 shards run two per pair sequentially, without sharing GPUs. Training never
