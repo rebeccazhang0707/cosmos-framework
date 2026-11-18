@@ -4,7 +4,7 @@
 # Requires ROBODOJO_REASONER_CHECKPOINT_PATH: a full local Edge HF snapshot,
 # in addition to the control recipe's data, base DCP and VAE paths.
 # Use micro160 x accumulation1 x16 = global batch2560, matching the control's
-# effective batch. Additional UND tokens/ViT require a GPU capacity check.
+# effective batch. Full-block recompute reduces the measured backward peak.
 [job]
 task = "vfm"
 experiment = "action_policy_robodojo_four_tasks_wam_480_reasoner_vit"
@@ -22,8 +22,7 @@ data_parallel_shard_degree = 8
 data_parallel_replicate_degree = 2
 
 [model.activation_checkpointing]
-mode = "selective"
-save_ops_regex = ["fmha"]
+mode = "full"
 
 [model.tokenizer]
 vae_path = "${oc.env:WAN_VAE_PATH}"

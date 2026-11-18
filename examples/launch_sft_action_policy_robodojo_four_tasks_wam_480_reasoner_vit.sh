@@ -2,6 +2,7 @@
 # Run once on each of two 8-GPU nodes with a shared MASTER_ADDR and NODE_RANK=0/1.
 # Raw joint14 WAM; 736x544 / shift5, current-image+text reasoner prefill, no AR.
 set -euo pipefail
+export PYTORCH_ALLOC_CONF="${PYTORCH_ALLOC_CONF:-expandable_segments:True}"
 
 TOML_FILE="examples/toml/sft_config/action_policy_robodojo_four_tasks_wam_480_reasoner_vit.toml"
 : "${ROBODOJO_PREPARED_ROOT:?Set the original four-task joint-action prepared directory}"

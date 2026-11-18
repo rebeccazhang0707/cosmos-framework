@@ -8,6 +8,10 @@ domain17; current state + 16 target actions; a 736×544 stitched camera canvas.
 The optimizer, seed42, global batch2560, and 1600-step limit remain the same.
 This recipe uses micro160 × accumulation1 ×16 GPUs, while the control uses
 micro80 × accumulation2. This is an independent experiment/run name.
+Full-block activation checkpointing recomputes attention during backward to
+reduce the measured micro160 peak; the paired launcher enables expandable
+allocator segments. The original selective checkpoint policy ran out of memory
+during the first backward with micro160 and image-conditioned UND tokens.
 
 Each training sample takes **only RGB t=0**, after the existing resize/padding,
 through the released, frozen Edge SigLIP2 encoder and projector. The native
