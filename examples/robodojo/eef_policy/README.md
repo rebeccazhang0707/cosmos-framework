@@ -40,12 +40,12 @@ immutable `RUN/continuation/snapshots/segmentNN` saved at a training boundary.
 The corresponding `segmentNN_finish.json` supplies `final_step` and
 `new_checkpoint`. Future evaluation phases resume native episode manifests.
 Each evaluation phase uses two nodes for at most four hours. The next training
-segment depends only on preceding training, never on evaluation. Two evaluation
-phases can be queued per snapshot; a completed quota costs no further inference.
+segment depends only on preceding training, never on evaluation. One evaluation
+phase is sufficient for the reduced budget; old continuation phases are cancelled.
 No-op safety training segments skip duplicate evaluations.
 
-The protocol matches the earlier joint experiment: 150 episodes per family,
-600 total, seeds 0/1/2; stack-bowls and push-T include their standard/random
+The protocol matches the earlier joint experiment: 15 episodes per family,
+60 total, seeds 0/1/2; stack-bowls and push-T include their standard/random
 variants. Preserve five preselected episodes per family with all three native
 camera videos. Video pruning affects only completed episodes in this unique
 evaluation run. Results, episode counts, config/normalizer hashes and original
@@ -86,3 +86,9 @@ and `--python REPORT_PYTHON`. It invokes the existing script's `--publish`
 entry point every60 seconds, writes `public/publication_status.json`, and exits
 when SR finishes. It uses a per-run lock, preserves native videos, and never
 restarts inference or training.
+
+SR protocol `sr15_seed3x5_v1` uses five valid episodes/family/seed,60 total.
+Standard/random variants alternate3+2 and2+3 across seeds (8/7 overall).
+Previously larger native results are summarized with an outcome-independent
+first-quota prefix; the original outcomes remain unchanged and full reports are
+archived under `legacy_150/`. All held-out loss windows remain in validation.

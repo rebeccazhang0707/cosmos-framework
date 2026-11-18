@@ -19,7 +19,7 @@ monitor stops after a full optimizer step before the four-hour deadline.
 segments after reaching1600. The goal is not a reset at each Slurm boundary.
 
 Each boundary has independent validation and native SR branches; training
-never waits for either. SR targets150 episodes/task and keeps five native
+never waits for either. SR targets15 episodes/task and keeps five native
 three-camera bundles/task. Partial counts/video links publish every minute.
 
 `validate.sbatch` evaluates all2222 held-out windows, EMA weights, with both
@@ -29,3 +29,9 @@ record the evaluation override separately from the training shift. The latter
 appears on the loss comparison curve; the former remains available as
 `validation_native.json`. Geometry still differs, so image loss is not an
 identical-target metric across the resolutions.
+
+SR protocol `sr15_seed3x5_v1` uses five valid episodes/family/seed,60 total.
+Standard/random variants alternate3+2 and2+3 across seeds (8/7 overall).
+Previously larger native results are summarized with an outcome-independent
+first-quota prefix; the original outcomes remain unchanged and full reports are
+archived under `legacy_150/`. All held-out loss windows remain in validation.

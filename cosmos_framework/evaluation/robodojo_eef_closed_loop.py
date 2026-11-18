@@ -1,4 +1,4 @@
-"""Periodic EEF closed-loop SR:150 episodes/family, fixed five original camera bundles."""
+"""Periodic EEF closed-loop SR:15 episodes/family, fixed five original camera bundles."""
 
 import argparse
 import csv
@@ -16,6 +16,13 @@ from pathlib import Path
 
 import yaml
 
+from cosmos_framework.evaluation.robodojo_sr_protocol import (
+    EPISODES_PER_FAMILY,
+    TOTAL_EPISODES,
+    evaluation_cells,
+    native_prefix_metrics,
+)
+
 REPO = Path(__file__).resolve().parents[2]
 ROOT = Path(os.environ["ROBODOJO_EEF_RUN"])
 STAGE = int(os.environ["ROBODOJO_EEF_STAGE"])
@@ -27,18 +34,8 @@ BENCH = Path(os.environ["ROBODOJO_BENCH_ROOT"])
 POLICY = REPO / "examples/robodojo/eef_policy"
 CAMERAS = ("cam_head", "cam_left_wrist", "cam_right_wrist")
 FAMILIES = ("classify_objects", "stack_bowls", "push_T", "insert_tubes")
-CELLS = [
-    (task, seed, quota)
-    for seed in range(3)
-    for task, quota in [
-        ("classify_objects", 50),
-        ("insert_tubes", 50),
-        ("stack_bowls", 25),
-        ("stack_bowls_random", 25),
-        ("push_T", 25),
-        ("push_T_random", 25),
-    ]
-]
+CELLS = evaluation_cells()
+
 STEPS = {
     "classify_objects": 1100,
     "insert_tubes": 500,
@@ -149,9 +146,13 @@ def initialize():
         "weights": "EMA",
         "config_file": str(config_path),
         "config_sha256": hashlib.sha256(config_path.read_bytes()).hexdigest(),
-        "episodes_per_family": 150,
-        "episodes": 600,
+        "episodes_per_family": EPISODES_PER_FAMILY,
+        "episodes": TOTAL_EPISODES,
         "seeds": [0, 1, 2],
+        "episodes_per_family_per_seed": 5,
+        "protocol_version": "sr15_seed3x5_v1",
+        "initial_states": "Official pre-generated Eval_Layout files, ordered within seed; first valid episodes per fixed variant quota",
+        "selection_policy": "First valid episodes per fixed seed/variant quota, independent of outcome; native history may contain more episodes",
         "num_envs_per_client": 1,
         "guidance": 1.0,
         "denoising_steps": 30,
@@ -182,7 +183,8 @@ def publish():
         fcntl.flock(lock, fcntl.LOCK_EX)
         manifest = json.loads((OUT / "manifest.json").read_text())
         families = {
-            family: {"episodes": 0, "target": 150, "successes": 0, "score_sum": 0, "videos": []} for family in FAMILIES
+            family: {"episodes": 0, "target": EPISODES_PER_FAMILY, "successes": 0, "score_sum": 0, "videos": []}
+            for family in FAMILIES
         }
         cells = []
         for task, seed, quota in CELLS:
@@ -193,18 +195,14 @@ def publish():
                 native = json.loads(path.read_text())
             except json.JSONDecodeError:
                 continue
-            completed = int(native.get("eval_time", 0))
-            if not 0 <= completed <= quota:
-                raise ValueError(f"Unexpected episode count: {path}: {completed}")
-            details = native.get("details", {})
-            if completed != len(details):
-                raise ValueError(f"Incomplete native episode accounting: {path}")
-            successes = sum(bool(value["success"]) for value in details.values())
+            metrics = native_prefix_metrics(native, quota)
+            completed = metrics["episodes"]
+            successes = metrics["successes"]
             family = task.removesuffix("_random")
             item = families[family]
             item["episodes"] += completed
             item["successes"] += successes
-            item["score_sum"] += float(native.get("score") or 0) * completed
+            item["score_sum"] += float(metrics["score"] or 0) * completed
             clips = retain_videos(path.parent, completed, keep_count(task, seed), run_id(task, seed))
             for clip in clips:
                 media = public / "media" / task / f"seed{seed}"
@@ -226,7 +224,10 @@ def publish():
                     "target": quota,
                     "successes": successes,
                     "success_rate": successes / completed if completed else None,
-                    "score": native.get("score"),
+                    "score": metrics["score"],
+                    "native_episodes": metrics["native_episodes"],
+                    "selected_episode_indices": metrics["selected_episode_indices"],
+                    "selected_layout_ids": metrics["selected_layout_ids"],
                     "result_path": str(path),
                     "complete": completed == quota,
                 }
@@ -268,8 +269,8 @@ def publish():
             "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "manifest": manifest,
             "episodes": episodes,
-            "target": 600,
-            "complete": episodes == 600,
+            "target": TOTAL_EPISODES,
+            "complete": episodes == TOTAL_EPISODES,
             "families": families,
             "cells": cells,
             "submission": submission,
@@ -290,11 +291,11 @@ def worker(index):
     deadline = float(os.environ["ROBODOJO_SR_DEADLINE"])
     for task, seed, quota in assignments()[index]:
         path = result_path(task, seed)
-        if path and json.loads(path.read_text()).get("eval_time") == quota:
+        if path and json.loads(path.read_text()).get("eval_time", 0) >= quota:
             continue
         if time.time() > deadline - 90:
             break
-        env = dict(os.environ, EVAL_NUM="native", EVAL_ENV_TYPE="sim", ROBODOJO_RUN_ID=run_id(task, seed))
+        env = dict(os.environ, EVAL_NUM=str(quota), EVAL_ENV_TYPE="sim", ROBODOJO_RUN_ID=run_id(task, seed))
         command = [
             "bash",
             str(REPO / "examples/robodojo/eef_policy/cell.sh"),
@@ -329,7 +330,7 @@ def worker(index):
         if code:
             raise RuntimeError(f"Native evaluation failed for {task}/{seed}: exit {code}")
         path = result_path(task, seed)
-        if not path or json.loads(path.read_text()).get("eval_time") != quota:
+        if not path or json.loads(path.read_text()).get("eval_time", 0) < quota:
             raise ValueError(f"Native quota incomplete for {task}/{seed}")
         publish()
 
