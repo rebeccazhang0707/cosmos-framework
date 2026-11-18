@@ -18,11 +18,17 @@ monitor stops after a full optimizer step before the four-hour deadline.
 `segments.py` pins immutable evaluation snapshots and cancels unused future
 segments after reaching1600. The goal is not a reset at each Slurm boundary.
 
-Each boundary has independent validation and native SR branches; training
-never waits for either. SR targets15 episodes/task and keeps five native
+Each boundary has **one** `evaluate.sbatch RUN SEGMENT` job, requesting one
+node / eight GPUs for at most four hours. It runs held-out validation first,
+then SR on four policy/simulator GPU pairs. The existing eight logical SR
+shards run two per pair sequentially, without sharing GPUs. Training never
+waits for evaluation. SR targets15 episodes/task and keeps five native
 three-camera bundles/task. Partial counts/video links publish every minute.
+Do not submit separate validation and SR jobs for this recipe.
 
-`validate.sbatch` evaluates all2222 held-out windows, EMA weights, with both
+The combined job executes `validate.sbatch` as a shell helper inside its
+allocation; the helper's SBATCH directives do not reserve another node.
+It evaluates all2222 held-out windows, EMA weights, with both
 native `eval_shift=5` and reference-comparable `eval_shift=10`, using the same
 batch size32 and seed42 protocol as the original joint exp1. Both results
 record the evaluation override separately from the training shift. The latter
