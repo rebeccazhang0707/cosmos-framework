@@ -5,8 +5,9 @@ The recipe is
 It inherits the four-task joint-space 480/shift5 control: classify_objects,
 insert_tubes, push_T and stack_bowls; raw absolute joint/gripper14 labels;
 domain17; current state + 16 target actions; a 736×544 stitched camera canvas.
-The optimizer, seed42, micro80 × accumulation2 ×16 GPUs, and 1600-step limit
-remain the same. This is an independent experiment/run name.
+The optimizer, seed42, global batch2560, and 1600-step limit remain the same.
+This recipe uses micro160 × accumulation1 ×16 GPUs, while the control uses
+micro80 × accumulation2. This is an independent experiment/run name.
 
 Each training sample takes **only RGB t=0**, after the existing resize/padding,
 through the released, frozen Edge SigLIP2 encoder and projector. The native
@@ -47,8 +48,8 @@ shared `MASTER_ADDR`, then run on each node:
 bash examples/launch_sft_action_policy_robodojo_four_tasks_wam_480_reasoner_vit.sh
 ```
 
-Additional ViT work and UND tokens increase memory and step time; micro80 is
-retained for comparison and requires a GPU capacity check. This implementation
+Additional ViT work and UND tokens increase memory and step time; micro160
+requires a GPU capacity check. This implementation
 is the **training path**. The current text-only policy server/evaluator must be
 adapted to supply the same image+text UND inputs before evaluating this
 checkpoint; this model rejects that old sampling path explicitly.
