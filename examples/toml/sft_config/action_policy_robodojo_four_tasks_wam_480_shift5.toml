@@ -1,7 +1,8 @@
 # Resolution/noise-schedule control against joint-space exp1 (960x736, tier720, shift10).
 # Changes: tier480, 736x544 reflection-padded canvas, explicit shared RF shift5.
 # Same raw joint14 action/state, original joint RGB, domain17, four-task360/40 split;
-# Edge initialization, seed42, micro80 x accumulation2 x16 GPUs = global batch2560;
+# Edge initialization, seed42, micro160 x accumulation1 x16 GPUs = global batch2560;
+# Same effective batch as the original micro80 x accumulation2 control.
 # LR5e-5, warmup50, action2llm/llm2action LR x5, modality LR x1, WAM horizon16.
 # Train through step1600. Four-hour jobs resume model/optimizer/scheduler/RNG.
 # Recipe registration is beside the original four-task WAM experiment.
@@ -43,12 +44,12 @@ f_max = [1.0]
 f_min = [0.0]
 
 [dataloader_train]
-max_samples_per_batch = 80
+max_samples_per_batch = 160
 
 [trainer]
 max_iter = 1600
 logging_iter = 1
-grad_accum_iter = 2
+grad_accum_iter = 1
 
 [trainer.callbacks.compile_tokenizer]
 enabled = false

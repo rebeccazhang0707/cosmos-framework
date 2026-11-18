@@ -3,13 +3,19 @@
 The paired reference is `robodojo_edge_ab_20261109/.../exp1_edge`: Edge WAM,
 raw absolute14D joint/gripper labels and clean joint state, four tasks,
 360 training /40 held-out demos, domain17, seed42. This control reads the
-**same joint-version videos and labels**, retaining micro80 × accumulation2
-×16 GPUs = global batch2560, the exp1 optimizer/LR multipliers/warmup,
+**same joint-version videos and labels**, retaining global batch2560
+(micro160 × accumulation1 ×16 GPUs), the exp1 optimizer/LR multipliers/warmup,
 chunk16 / stride8, and original action-head initialization.
 
 Changes are the 736×544 canvas, `resolution="480"`, and explicit shared RF
 `shift=5`. The initial comparison stops at1600 optimizer steps. Do not enlarge
-the batch just because the smaller canvas frees memory.
+the effective global batch just because the smaller canvas frees memory.
+The first segment of the 20261117 control was already running micro80 ×
+accumulation2 when this update was requested. It finishes without interruption;
+segments2 onward resume its full checkpoint with micro160 × accumulation1.
+The isolated continuation runtime differs only in these two TOML values;
+the original runtime and model/optimizer schedule remain unchanged. Capacity
+and speed of micro160 still need confirmation when the next segment runs.
 
 `train.sbatch RUN SEGMENT` uses an isolated run's `environment.sh` and checks
 its `control/config_audit.json`. Segment1 starts from Edge; subsequent segments
