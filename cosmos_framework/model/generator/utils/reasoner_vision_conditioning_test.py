@@ -45,7 +45,7 @@ def test_frozen_siglip_encoder_supports_bfloat16_position_interpolation():
     assert not features.requires_grad
 
 
-def _pack():
+def _pack(generation_marker=20):
     plans = [SequencePlan(has_text=True, has_vision=True, condition_frame_indexes_vision=[0]) for _ in range(2)]
     clean = GenerationDataClean(
         batch_size=2,
@@ -60,7 +60,8 @@ def _pack():
         ids,
         clean,
         torch.tensor([0.5, 0.6]),
-        special_tokens={"bos_token_id": 1, "eos_token_id": 2, "start_of_generation": 3},
+        # Native Edge aliases the GEN boundary with vision_start (token20).
+        special_tokens={"bos_token_id": 1, "eos_token_id": 2, "start_of_generation": generation_marker},
     )
     config = SimpleNamespace(
         image_token_id=19,
@@ -97,14 +98,17 @@ def test_legacy_wam_uint8_observation_matches_normalized_boundary():
     torch.testing.assert_close(raw, original)
 
 
-def test_native_grid_and_features_preserve_sample_boundaries_and_gen_positions():
-    packed, config, conditions = _pack()
+@pytest.mark.parametrize("generation_marker", [3, 20])
+def test_native_grid_and_features_preserve_sample_boundaries_and_gen_positions(generation_marker):
+    packed, config, conditions = _pack(generation_marker)
+    original_ids = packed.text_ids.clone()
     original_positions = packed.position_ids.clone()
     original_splits = packed.split_lens.copy()
     original_samples = packed.sample_lens.copy()
     pack_reasoner_vision(packed, conditions, config)
     assert packed.split_lens == original_splits
     assert packed.sample_lens == original_samples
+    torch.testing.assert_close(packed.text_ids, original_ids)
     assert packed.text_caption_lens[0] != packed.text_caption_lens[1]
     image_indexes = packed.reasoner_image_indexes
     assert image_indexes is not None
@@ -112,6 +116,13 @@ def test_native_grid_and_features_preserve_sample_boundaries_and_gen_positions()
     # Native spatial mRoPE: image rows have shared time but different H/W coordinates.
     assert first_grid[0].unique().numel() == 1
     assert first_grid[1].unique().numel() == first_grid[2].unique().numel() == 2
+    if generation_marker == config.vision_start_token_id:
+        cursor = 0
+        for (length,) in packed.text_caption_lens:
+            span = packed.text_indexes[cursor : cursor + length]
+            expected = (packed.position_ids[:, span[:-1]].max() + 1).expand(3)
+            torch.testing.assert_close(packed.position_ids[:, span[-1]], expected)
+            cursor += length
     is_gen = torch.ones(packed.sequence_length, dtype=torch.bool)
     is_gen[packed.text_indexes] = False
     torch.testing.assert_close(packed.position_ids[:, is_gen], original_positions[:, is_gen])

@@ -38,8 +38,10 @@ def pack_reasoner_vision(
 ) -> None:
     """Replace image placeholders and their positions without changing sample splits.
 
-    Compute native Edge mRoPE on the *final* causal span, including the packer's
-    BOS/EOS/BOV wrappers. GEN retains its existing modality coordinates and mask.
+    Compute native Edge mRoPE on the causal prompt, including BOS/EOS. Edge's
+    final BOV aliases vision_start, so position that boundary separately rather
+    than asking the native helper to interpret it as an image opener.
+    GEN retains its existing modality coordinates and mask.
     The usual MoT forward then computes per-layer image+text K/V on UND, visible
     to GEN within that same sample; UND cannot read generated/future tokens.
     """
@@ -58,9 +60,14 @@ def pack_reasoner_vision(
         expected = int(grid.prod(-1).sum()) // multimodal_config.vision_config.spatial_merge_size**2
         if image_indexes.numel() != expected or feature.shape[0] != expected:
             raise ValueError("Native image grid, placeholder count and ViT features disagree")
+        has_generation_boundary = ids[-1].item() == multimodal_config.vision_start_token_id
+        prompt_ids = ids[:-1] if has_generation_boundary else ids
         positions, _ = get_rope_index(
-            SimpleNamespace(config=multimodal_config), input_ids=ids[None], image_grid_thw=grid
+            SimpleNamespace(config=multimodal_config), input_ids=prompt_ids[None], image_grid_thw=grid
         )
+        if has_generation_boundary:
+            boundary_position = (positions.max() + 1).expand(3, 1, 1)
+            positions = torch.cat((positions, boundary_position), dim=-1)
         global_indexes = packed.text_indexes[cursor : cursor + length]
         offset = packed.position_ids[:, global_indexes[0]].clone()
         packed.position_ids[:, global_indexes] = positions[:, 0].to(packed.position_ids) + offset[:, None]
