@@ -8,9 +8,8 @@ env_gpu_id=$7
 additional_info=$9
 port=${10}
 host=${11:-localhost}
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-XPL_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-BENCH_ROOT="$(cd "${XPL_ROOT}/.." && pwd)"
+BENCH_ROOT=${ROBODOJO_BENCH_ROOT:?RoboDojo workspace root}
+XPL_ROOT="$BENCH_ROOT/XPolicyLab"
 export PYTHONPATH="${BENCH_ROOT}:${XPL_ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 export LD_LIBRARY_PATH="/lustre/fsw/general_sa/rebeccaz/.cache/robodojo-graphics/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 if [[ ${EVAL_ENV_TYPE:-sim} == debug ]]; then
