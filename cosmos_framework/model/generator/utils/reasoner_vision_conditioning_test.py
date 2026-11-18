@@ -81,6 +81,22 @@ def test_only_current_frame_enters_reasoner():
     assert not np.array_equal(np.asarray(current_observation(clip)), reference)
 
 
+def test_legacy_wam_uint8_observation_matches_normalized_boundary():
+    from cosmos_framework.model.generator.utils.batch_normalization import normalize_vision_batch_inplace
+
+    raw = torch.randint(0, 256, (1, 3, 17, 32, 64), dtype=torch.uint8)
+    original = raw.clone()
+    batch = {"video": [[raw]]}
+    # The legacy video column is intentionally left uint8 by this boundary;
+    # only the unified vision column is normalized before text/ViT prefill.
+    normalize_vision_batch_inplace(batch, video_key="video", tensor_kwargs_fp32={"device": "cpu"})
+    image = np.asarray(current_observation(batch["video"][0][0]))
+    np.testing.assert_array_equal(image, raw[0, :, 0].permute(1, 2, 0).numpy())
+    normalized = raw.float() / 127.5 - 1
+    np.testing.assert_array_equal(image, np.asarray(current_observation(normalized)))
+    torch.testing.assert_close(raw, original)
+
+
 def test_native_grid_and_features_preserve_sample_boundaries_and_gen_positions():
     packed, config, conditions = _pack()
     original_positions = packed.position_ids.clone()

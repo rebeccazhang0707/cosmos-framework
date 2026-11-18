@@ -12,12 +12,22 @@ from cosmos_framework.model.generator.reasoner.qwen3_vl.utils import get_rope_in
 
 
 def current_observation(clip: torch.Tensor) -> Image.Image:
-    """Read only t=0 of a normalized [C,T,H,W] WAM clip (never a future label)."""
+    """Read only t=0 of uint8 or normalized [C,T,H,W] RGB (never a future label).
+
+    Legacy WAM batches stay uint8 until VAE encoding; unified vision batches
+    are normalized earlier. Do not normalize or transfer the future frames.
+    """
     if clip.ndim == 5 and clip.shape[0] == 1:
         clip = clip[0]
-    if clip.ndim != 4 or clip.shape[0] != 3 or clip.dtype == torch.uint8:
-        raise ValueError("Reasoner expects a normalized RGB [3,T,H,W] clip")
-    pixels = ((clip[:, 0].detach().float() + 1) * 127.5).round().clamp(0, 255).to(torch.uint8)
+    if clip.ndim != 4 or clip.shape[0] != 3:
+        raise ValueError("Reasoner expects an RGB [3,T,H,W] clip")
+    frame = clip[:, 0].detach()
+    if frame.dtype == torch.uint8:
+        pixels = frame
+    elif frame.is_floating_point():
+        pixels = ((frame.float() + 1) * 127.5).round().clamp(0, 255).to(torch.uint8)
+    else:
+        raise ValueError("Reasoner pixels must be uint8 or normalized floating point")
     return Image.fromarray(pixels.permute(1, 2, 0).cpu().numpy())
 
 
