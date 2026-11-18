@@ -1,0 +1,59 @@
+# Four-task joint14 WAM, 736x544 / shift5; current image + JSON text on UND.
+# Frozen native Edge SigLIP2/projector and reasoner; train GEN + action heads.
+# No autoregressive reasoning or planning tokens. Only observation t=0 enters ViT.
+# Requires ROBODOJO_REASONER_CHECKPOINT_PATH: a full local Edge HF snapshot,
+# in addition to the control recipe's data, base DCP and VAE paths.
+# Keep micro80 x accumulation2 x16 for the paired comparison. Additional UND
+# tokens/ViT increase memory and latency; validate GPU capacity before a long run.
+[job]
+task = "vfm"
+experiment = "action_policy_robodojo_four_tasks_wam_480_reasoner_vit"
+project = "robodojo"
+group = "four_tasks_wam"
+name = "edge_joint14_480_shift5_reasoner_vit_16gpu"
+wandb_mode = "disabled"
+
+[model]
+precision = "bfloat16"
+max_num_tokens_after_packing = -1
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 2
+
+[model.activation_checkpointing]
+mode = "selective"
+save_ops_regex = ["fmha"]
+
+[model.tokenizer]
+vae_path = "${oc.env:WAN_VAE_PATH}"
+
+[optimizer]
+lr = 5e-5
+weight_decay = 0.05
+betas = [0.9, 0.99]
+eps = 1e-8
+lr_multipliers = {action2llm = 5.0, llm2action = 5.0, action_modality_embed = 1.0}
+
+[scheduler]
+cycle_lengths = [16000]
+warm_up_steps = [50]
+f_start = [0.0]
+f_max = [1.0]
+f_min = [0.0]
+
+[dataloader_train]
+max_samples_per_batch = 80
+
+[trainer]
+max_iter = 1600
+logging_iter = 1
+grad_accum_iter = 2
+
+[trainer.callbacks.compile_tokenizer]
+enabled = false
+
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH}"
+save_iter = 50
+keys_to_skip_loading = ["net_ema.", "action2llm", "llm2action"]

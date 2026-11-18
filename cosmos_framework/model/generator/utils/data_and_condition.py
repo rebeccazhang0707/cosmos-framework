@@ -101,6 +101,10 @@ class GenerationDataClean:
     action_sample_ids: list[int] | None = None
     sound_sample_ids: list[int] | None = None
 
+    # Frozen Edge ViT features and native grids for CURRENT observations only.
+    # Plain tensor dictionaries survive the training payload's CP broadcast.
+    reasoner_vision: list[dict[str, torch.Tensor]] | None = None
+
     def vision_image_flags(self) -> list[bool] | None:
         """Expand sample identities to the flattened vision-item order."""
         if self.sample_is_image is None:

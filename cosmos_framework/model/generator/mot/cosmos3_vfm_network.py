@@ -895,6 +895,15 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             tuple of (packed_sequence, target_dtype) where packed_sequence has text embeddings filled in.
         """
         packed_text_embedding = self.language_model.model.embed_tokens(packed_seq.text_ids)  # [N_text,hidden_size]
+        if packed_seq.reasoner_image_indexes is not None:
+            features = packed_seq.reasoner_image_features
+            if features is None or features.shape != (packed_seq.reasoner_image_indexes.numel(), self.hidden_size):
+                raise ValueError("Reasoner image placeholders and projected ViT features must match")
+            packed_text_embedding = packed_text_embedding.index_copy(
+                0,
+                packed_seq.reasoner_image_indexes.to(packed_text_embedding.device),
+                features.to(packed_text_embedding),
+            )
         packed_sequence = packed_text_embedding.new_zeros(
             size=(packed_seq.sequence_length, self.hidden_size)
         )  # [N_total,hidden_size]

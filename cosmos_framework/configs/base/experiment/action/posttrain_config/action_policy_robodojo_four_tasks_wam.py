@@ -11,6 +11,7 @@ from cosmos_framework.configs.base.experiment.action.posttrain_config.action_pol
 from cosmos_framework.configs.base.experiment.sft.models.edge_model_config import EDGE_MODEL_CONFIG
 from cosmos_framework.data.generator.action.datasets.robodojo_policy_dataset import get_robodojo_policy_sft_dataset
 from cosmos_framework.data.generator.processors import build_processor
+from cosmos_framework.model.generator.omni_mot_reasoner_vision_model import OmniMoTReasonerVisionModel
 from cosmos_framework.utils.lazy_config import LazyCall as L
 
 action_policy_robodojo_four_tasks_wam = copy.deepcopy(action_policy_droid_nano)
@@ -66,4 +67,20 @@ small["dataloader_train"]["dataloader"]["datasets"]["robodojo"]["dataset"].updat
 )
 ConfigStore.instance().store(
     group="experiment", package="_global_", name="action_policy_robodojo_four_tasks_wam_480_shift5", node=small
+)
+
+# Same joint14 / 480 / shift5 control, with current-image UND conditioning.
+# The local Edge snapshot supplies matching tokenizer, SigLIP2 and projector.
+action_policy_robodojo_four_tasks_wam_480_reasoner_vit = copy.deepcopy(small)
+vision = action_policy_robodojo_four_tasks_wam_480_reasoner_vit
+vision["model"].update(
+    _target_=OmniMoTReasonerVisionModel,
+    reasoner_checkpoint_path="${oc.env:ROBODOJO_REASONER_CHECKPOINT_PATH}",
+    reasoner_max_pixels=400384,  # 736x544 -> 46x34 patches -> 391 merged UND tokens.
+)
+vision["model"]["config"]["vlm_config"]["tokenizer"] = L(build_processor)(
+    tokenizer_type="${oc.env:ROBODOJO_REASONER_CHECKPOINT_PATH}", use_native_edge_processor=True
+)
+ConfigStore.instance().store(
+    group="experiment", package="_global_", name="action_policy_robodojo_four_tasks_wam_480_reasoner_vit", node=vision
 )

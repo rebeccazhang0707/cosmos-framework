@@ -1389,6 +1389,10 @@ class PackedSequence:
     # without interpreting arbitrary control/target items as separate cameras.
     multiview_action_temporal_factor: int | None = None
 
+    # Indices are relative to text_ids, i.e. the causal UND stream, not GEN.
+    reasoner_image_indexes: torch.Tensor | None = None
+    reasoner_image_features: torch.Tensor | None = None
+
     def __post_init__(self) -> None:
         self._sequence_pack_metadata: SequencePackMetadata | None = None
         assert isinstance(self.text_ids, torch.Tensor), "PackedSequence.text_ids must be finalized"
@@ -1418,6 +1422,11 @@ class PackedSequence:
         self.text_ids = to_device_nonblocking(self.text_ids, "cuda")
         self.text_indexes = to_device_nonblocking(self.text_indexes, "cuda")
         self.position_ids = to_device_nonblocking(self.position_ids, "cuda")
+        if self.reasoner_image_indexes is not None:
+            if self.reasoner_image_features is None:
+                raise ValueError("Reasoner image indexes require matching features")
+            self.reasoner_image_indexes = to_device_nonblocking(self.reasoner_image_indexes, "cuda")
+            self.reasoner_image_features = to_device_nonblocking(self.reasoner_image_features, "cuda")
         if isinstance(self.label_ids, torch.Tensor):
             self.label_ids = to_device_nonblocking(self.label_ids, "cuda")
         if isinstance(self.ce_loss_indexes, torch.Tensor):

@@ -309,12 +309,14 @@ class Siglip2VisionTransformer(PreTrainedModel):
         offset = 0
         for t, height, width in grid_thw:
             resized_embeddings = F.interpolate(
-                positional_embedding,
+                # Antialiased interpolation has no BF16 kernel on some backends.
+                # Keep interpolation in FP32, then restore the encoder's dtype.
+                positional_embedding.float(),
                 size=(height.cpu().item(), width.cpu().item()),
                 mode="bilinear",
                 align_corners=False,
                 antialias=True,
-            )
+            ).to(positional_embedding.dtype)
             resized_embeddings = resized_embeddings.reshape(embed_dim, -1).transpose(0, 1)
 
             num_spatial_tokens = height * width
