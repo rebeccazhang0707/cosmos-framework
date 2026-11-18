@@ -3,7 +3,7 @@
 # Same raw joint14 action/state, original joint RGB, domain17, four-task360/40 split;
 # Edge initialization, seed42, micro80 x accumulation2 x16 GPUs = global batch2560;
 # LR5e-5, warmup50, action2llm/llm2action LR x5, modality LR x1, WAM horizon16.
-# First compare at step800. Four-hour jobs resume model/optimizer/scheduler/RNG.
+# Train through step1600. Four-hour jobs resume model/optimizer/scheduler/RNG.
 # Recipe registration is beside the original four-task WAM experiment.
 [job]
 task = "vfm"
@@ -46,7 +46,7 @@ f_min = [0.0]
 max_samples_per_batch = 80
 
 [trainer]
-max_iter = 800
+max_iter = 1600
 logging_iter = 1
 grad_accum_iter = 2
 

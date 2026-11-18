@@ -56,7 +56,7 @@ class SegmentTests(unittest.TestCase):
             self.call("finish", root, 1)
             snapshot = root / "continuation/snapshots/segment01"
             self.call("prepare", root, 2)
-            self.checkpoint(train, 800)
+            self.checkpoint(train, 1600)
             plan = dict(
                 jobs=[
                     dict(segment=1, job_id="old_eval"),

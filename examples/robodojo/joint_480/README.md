@@ -8,7 +8,7 @@ raw absolute14D joint/gripper labels and clean joint state, four tasks,
 chunk16 / stride8, and original action-head initialization.
 
 Changes are the 736×544 canvas, `resolution="480"`, and explicit shared RF
-`shift=5`. The initial comparison stops at800 optimizer steps. Do not enlarge
+`shift=5`. The initial comparison stops at1600 optimizer steps. Do not enlarge
 the batch just because the smaller canvas frees memory.
 
 `train.sbatch RUN SEGMENT` uses an isolated run's `environment.sh` and checks
@@ -16,7 +16,7 @@ its `control/config_audit.json`. Segment1 starts from Edge; subsequent segments
 require all model/optimizer/scheduler/trainer DCP metadata. The native training
 monitor stops after a full optimizer step before the four-hour deadline.
 `segments.py` pins immutable evaluation snapshots and cancels unused future
-segments after reaching800. The goal is not a reset at each Slurm boundary.
+segments after reaching1600. The goal is not a reset at each Slurm boundary.
 
 Each boundary has independent validation and native SR branches; training
 never waits for either. SR targets150 episodes/task and keeps five native

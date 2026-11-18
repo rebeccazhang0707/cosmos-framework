@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 TRAIN_RELATIVE = Path("train/robodojo/four_tasks_wam/edge_joint14_480_shift5_16gpu")
-GOAL = 800
+GOAL = 1600
 
 
 def atomic(path, value):
