@@ -91,3 +91,36 @@ def test_submits_once_between_running_and_pending_baseline_evaluations():
                 hours=4,
             )
         ]
+
+
+def test_additional_checkpoint_keeps_milestone_and_serializes_evaluations():
+    with tempfile.TemporaryDirectory() as tmp:
+        root, base = Path(tmp) / "vit", Path(tmp) / "base"
+        train = fixture(root)
+        fixture(base)
+        original_base = dict(jobs=[dict(kind="eval", segment=4, job_id="111", dependency="afterok:444")])
+        (base / "continuation/plan.json").write_text(json.dumps(original_base))
+        milestone = root / "continuation/evaluation_schedule.json"
+        milestone.write_text('{"state":"waiting_for_checkpoint","target_step":1000}')
+        for step in (665, 1000):
+            for part in ("model", "optim", "scheduler", "trainer"):
+                p = train / f"checkpoints/iter_{step:09d}/{part}"
+                p.mkdir(parents=True)
+                (p / ".metadata").touch()
+        extra = root / "continuation/evaluation_schedule_step000665.json"
+        with (
+            patch("subprocess.check_output", side_effect=["111|PENDING|(Priority)\n", "999\n"]),
+            patch("subprocess.run") as mutate,
+        ):
+            result = schedule(root, base, 665, extra, after_eval="111")
+        assert result["job_id"] == "999" and result["target_step"] == 665
+        assert result["dependency"] == "afterany:111"
+        assert json.loads((base / "continuation/plan.json").read_text()) == original_base
+        assert not any(call.args[0][1] == "hold" for call in mutate.call_args_list)
+        assert json.loads(milestone.read_text()) == dict(state="waiting_for_checkpoint", target_step=1000)
+        with patch("subprocess.check_output", return_value="999|RUNNING|node1\n") as query:
+            result = schedule(root, base, 1000)
+            assert query.call_count == 1  # Queue query only; no second sbatch allocation.
+        assert result["state"] == "waiting_for_prior_evaluation"
+        assert result["prior_evaluation_jobs"] == ["999"] and result["target_step"] == 1000
+        assert not result.get("job_id")

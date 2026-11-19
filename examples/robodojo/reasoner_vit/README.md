@@ -68,5 +68,10 @@ It inserts that job into the baseline evaluation dependency chain so at most
 one evaluation node runs across both experiments. No GPU waits for training
 to reach the target. Native SR and full held-out losses share one
 one-node/eight-GPU job and retain five three-camera bundles/task.
+An additional checkpoint can use `--status-file` without replacing the
+step1000 milestone. `--after-eval JOB` preserves an already-queued baseline
+evaluation's position; the milestone waits while an earlier ViT evaluation
+is pending or running. The supervisor uses a pinned controller under
+`control/eval/` when present, keeping model inference code frozen separately.
 Use an isolated inference runtime containing the image-conditioned sampler;
 leave the frozen running training runtime unchanged.

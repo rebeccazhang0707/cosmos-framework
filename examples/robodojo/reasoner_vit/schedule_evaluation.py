@@ -49,8 +49,8 @@ def pin_checkpoint(root, step):
     return target
 
 
-def schedule(root, base_root, step):
-    status_path = root / "continuation/evaluation_schedule.json"
+def schedule(root, base_root, step, status_path=None, after_eval=None):
+    status_path = status_path or root / "continuation/evaluation_schedule.json"
     with (root.parent / ".robodojo_evaluation_submit.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         previous_status = json.loads(status_path.read_text()) if status_path.exists() else {}
@@ -72,20 +72,44 @@ def schedule(root, base_root, step):
         base_path = base_root / "continuation/plan.json"
         base = json.loads(base_path.read_text())
         evaluations = sorted([r for r in base["jobs"] if r["kind"] == "eval"], key=lambda r: r["segment"])
-        query = subprocess.check_output(
-            ["squeue", "-h", "-u", getpass.getuser(), "-o", "%i|%T|%R"], text=True
-        )
+        query = subprocess.check_output(["squeue", "-h", "-u", getpass.getuser(), "-o", "%i|%T|%R"], text=True)
         states = {parts[0]: parts[1:] for line in query.splitlines() if (parts := line.split("|", 2))}
+        vit_plan_path = root / "continuation/plan.json"
+        vit_plan = json.loads(vit_plan_path.read_text())
+        earlier = [
+            row["job_id"]
+            for row in vit_plan["jobs"]
+            if row.get("kind") == "eval"
+            and row.get("target_step", step) < step
+            and states.get(row["job_id"], [None])[0] in ("PENDING", "RUNNING", "CONFIGURING", "COMPLETING")
+        ]
+        if earlier:
+            value = dict(
+                state="waiting_for_prior_evaluation",
+                target_step=step,
+                prior_evaluation_jobs=earlier,
+                nodes=1,
+                gpus=8,
+                hours=4,
+                updated_at=datetime.now(timezone.utc).isoformat(),
+            )
+            atomic(status_path, value)
+            return value
         running = [
             r["job_id"]
             for r in evaluations
             if states.get(r["job_id"], [None])[0] in ("RUNNING", "CONFIGURING", "COMPLETING")
         ]
         pending = [r for r in evaluations if states.get(r["job_id"], [None])[0] == "PENDING"]
-        following = pending[0] if pending else None
+        if after_eval:
+            predecessor = next(row for row in evaluations if row["job_id"] == after_eval)
+            following = next((row for row in pending if row["segment"] > predecessor["segment"]), None)
+            if after_eval in states:
+                running = list(dict.fromkeys([*running, after_eval]))
+        else:
+            following = pending[0] if pending else None
         original_base = json.dumps(base)
         original_following_dependency = following["dependency"] if following else None
-        vit_plan_path = root / "continuation/plan.json"
         original_vit = vit_plan_path.read_text()
         submission_path = (
             base_root / f"continuation/evaluations/segment{following['segment']:02d}/submission.json"
@@ -201,10 +225,16 @@ def main():
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--base-run", type=Path, required=True)
     parser.add_argument("--step", type=int, default=1000)
+    parser.add_argument(
+        "--status-file", type=Path, help="Keep an additional checkpoint evaluation separate from the milestone"
+    )
+    parser.add_argument(
+        "--after-eval", help="Preserve this already-queued baseline evaluation before the additional job"
+    )
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
     while True:
-        result = schedule(args.run_root, args.base_run, args.step)
+        result = schedule(args.run_root, args.base_run, args.step, args.status_file, args.after_eval)
         print(json.dumps(result, ensure_ascii=False), flush=True)
         if args.once or result.get("job_id"):
             return
