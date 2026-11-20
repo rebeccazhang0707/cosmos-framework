@@ -101,6 +101,7 @@ def make_config() -> Config:
     import cosmos_framework.configs.base.experiment.action.posttrain_config.action_fd_droid_posttrain  # noqa: F401
     import cosmos_framework.configs.base.experiment.action.posttrain_config.action_policy_robodojo_four_tasks_wam  # noqa: F401
     import cosmos_framework.configs.base.experiment.action.posttrain_config.action_policy_robodojo_four_tasks_eef_wam  # noqa: F401
+    import cosmos_framework.configs.base.experiment.action.posttrain_config.action_policy_robodojo_all_tasks_wam  # noqa: F401
     import cosmos_framework.configs.base.experiment.sft.vision_sft_nano  # noqa: F401
     import cosmos_framework.configs.base.experiment.sft.vision_sft_super  # noqa: F401
     import cosmos_framework.configs.base.experiment.sft.vision_sft_edge  # noqa: F401
