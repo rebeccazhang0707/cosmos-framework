@@ -75,3 +75,54 @@ is pending or running. The supervisor uses a pinned controller under
 `control/eval/` when present, keeping model inference code frozen separately.
 Use an isolated inference runtime containing the image-conditioned sampler;
 leave the frozen running training runtime unchanged.
+
+## Register the adapters on another machine
+
+All custom policy code is versioned in this Cosmos checkout. The shared joint14
+adapter lives in `examples/robodojo/joint_policy`; the ViT wrapper imports it as
+`XPolicyLab.policy.Cosmos3_Edge_RoboDojo`. Both registrations are required.
+The compatible benchmark revisions are RoboDojo
+`f57e1633ffed59761bc8e568cfe7530c4b33381c` and its XPolicyLab submodule
+`5d0be1499634d3176258c8f2e31f5fe816497b0a`.
+
+After initializing that submodule, run from the Cosmos repository:
+
+```bash
+python examples/robodojo/install_vit_policy.py \
+    --bench-root /home/rebeccaz/Projects/RoboDojo
+```
+
+This creates local relative symlinks for `Cosmos3_Edge_RoboDojo` and
+`Cosmos3_Edge_RoboDojo_ViT` and applies the one-line
+`argparse.ArgumentParser(allow_abbrev=False)` client fix. Existing matching
+links and an already-patched client are preserved. Conflicting directories or
+links are reported before the checkout is changed. Relocate a previous local
+adapter explicitly before installing; the installer does not replace it.
+The standalone client diff is also versioned in
+`examples/robodojo/patches/eval_client_no_abbrev.patch`.
+
+This is evaluation-only integration for `arx_x5`, absolute joint/gripper14
+actions, and one environment per client (`eval_batch: false`). Use
+`policy_name: Cosmos3_Edge_RoboDojo_ViT`, 30 denoising steps, guidance1,
+action chunks16, and EMA weights to match the existing evaluation.
+RoboDojo/XPolicyLab provide RGB observations and joint packing helpers; the
+adapters add no camera-channel conversion or custom decoding.
+
+For the step665 export, point `checkpoint_path` at
+`checkpoints/robodojo_joint480_vit_step665/checkpoints/iter_000000665`
+inside the new Cosmos workspace. Make a separate inference config from its
+exported `config.yaml`: set the checkpoint load path to that directory,
+`load_training_state: false`, `load_ema_to_reg: true`, and
+`keys_to_skip_loading: []`. Update `model.reasoner_checkpoint_path`,
+`model.config.vlm_config.tokenizer.tokenizer_type`, and
+`model.config.tokenizer.vae_path` for the destination's Edge snapshot and VAE.
+The adapter's `config_file` must refer to this inference config, and its
+`output_dir` must be a new writable result directory.
+
+The installer registers code only. Prepare the native RoboDojo `Assets`
+directory (including evaluation layouts), the Edge HF vision/tokenizer
+snapshot, the VAE, and separate Cosmos-policy and IsaacLab environments.
+The checked-in Slurm/server/client shell scripts describe the original
+cluster environment and still contain its absolute environment, graphics,
+ffmpeg and cache paths. Adapt those paths to the new machine before invoking
+those launchers; registering the adapters does not install those runtimes.
